@@ -1,0 +1,220 @@
+---
+title: "Your title here"
+author: "Your name here"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    theme: journal #you can change and delete these comments
+    highlight: monochrome #you can change and delete these comments
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+# Introduction
+
+Write a short (2-3 paragraph) introduction about your species. 
+Explain why you picked it. 
+Cleearly explain you aims
+
+# Methods
+
+## Data
+
+### Acquiring Species Occurrence Data
+
+Explain your occurence data. Source, how many and the years etc.. 
+
+```{r include=FALSE}
+library(biomod2)
+library(raster)
+library(dismo)
+library(sp)
+library(dplyr)
+
+#change the related part for you selected species
+#change all "aedes" variables below
+
+aedes <- gbif('your selection genus', 'your selection species', ext=NULL, args=NULL, geo=TRUE, sp=TRUE, 
+              removeZeros=TRUE, download=TRUE, ntries=5, start = 1, end = 300) 
+
+
+aedes.df <- data.frame(aedes)
+aedesXY <- aedes.df[,c('lon','lat')]
+aedesdfs <- slice_sample(aedesXY, n = 100, replace = FALSE) 
+
+```
+
+### Formating Data for biomod2
+
+Eplain which layers do you use
+
+```{r include=FALSE}
+myRespName <- 'aedes.albopictus'
+myResp <- SpatialPoints(coords = aedesdfs, proj4string = CRS(as.character(NA)), bbox = NULL)
+myRespXY <- data.frame(aedesdfs)
+
+#Why did you choose these parameters, write clearly
+
+bio1 <- raster("wc2.1_5m_bio_1.tif") #Annual Mean Temperature
+bio2 <- raster("wc2.1_5m_bio_2.tif") #Mean Diurnal Range
+bio12 <- raster("wc2.1_5m_bio_12.tif") #Annual Precipitation
+
+myExpl <- stack(bio1, bio2, bio12)
+plot(myExpl)
+
+myBiomodData <- BIOMOD_FormatingData(resp.var=myResp,
+                                     expl.var = myExpl,
+                                     resp.xy= myRespXY,
+                                     resp.name=myRespName,
+                                     PA.nb.rep = 1,
+                                     PA.nb.absences = 100,
+                                     PA.strategy = 'random',
+                                     na.rm = TRUE)
+
+```
+
+### Acquiring Historical & Future Bioclimatic Variables
+
+[Historical bioclimatic variables](https://www.worldclim.org/data/worldclim21.html) were acquired from WorldClim website with 5 minutes spatial resolution ^[6]^.
+
+[Future bioclimatic variables](https://www.worldclim.org/data/cmip6/cmip6_clim5m.html) were acquired from WorldClim website with 5 minutes spatial resolution for 2021-2040 time period and MIROC6 estimations for SSP370 ^[7]^. 
+
+WHY do you use these explain in the text?
+
+## Modeling
+
+EXPLAIN you modelling apporach. Which algorithms do you use? How many replicates do you makes.
+Can you merge them (ensemble?)?
+
+
+```{r include=FALSE}
+myBiomodModelout <- BIOMOD_Modeling(bm.format = myBiomodData,
+                                    modeling.id = paste(myRespName,"Modeling",sep=""),
+                                    models = c('GAM', 'MAXENT.Phillips'),
+                                    nb.rep = 1,
+                                    data.split.perc = 80,
+                                    prevalence = 0.5,
+                                    var.import = 3,
+                                    metric.eval = c('ROC', 'TSS'),
+                                    scale.models = TRUE,
+                                    do.full.models = FALSE)
+```
+
+## Projections
+
+Both projections were done by **BIOMOD_Projection** function of **biomod2** R package. 
+ 
+### Current Projection
+
+Explain which period do you project?
+Future or present.
+
+```{r include=FALSE}
+myBiomodProj <- BIOMOD_Projection(bm.mod = myBiomodModelout,
+                                  new.env = myExpl,
+                                  proj.name = 'current',
+                                  models.chosen = 'all',
+                                  metric.binary = c('ROC', 'TSS'),
+                                  compress = TRUE,
+                                  clamping.mask=F)
+```
+
+### Future or Past???? Projection
+
+Which period, which climate model do you select and which ssp? 
+
+```{r include=FALSE}
+abio <- raster::stack("future.tif")
+a_bio1 <- subset(abio, 'future_1')
+a_bio2 <- subset(abio, 'future_2')
+a_bio12 <- subset(abio, 'future_12')
+
+myExplFuture <- stack(a_bio1, a_bio2, a_bio12)
+names(myExplFuture) = names(myExpl)
+plot(myExplFuture)
+```
+
+```{r include=FALSE}
+myBiomodProjFut <- BIOMOD_Projection(bm.mod = myBiomodModelout,
+                                     new.env = myExplFuture,
+                                     proj.name = 'future',
+                                     models.chosen = 'all',
+                                     metric.binary = c('ROC', 'TSS'),
+                                     compress = TRUE,
+                                     clamping.mask= F)
+```
+
+## Assessing Model Performances
+
+Make a short assement about your model performance.
+# Results
+
+## Present Projection
+
+Explain your present model results. 
+Is it realistic??
+Try to show only Turkiye and neighboring regions map NOT the whole world.
+
+```{r echo=FALSE}
+plot(myBiomodProj)
+```
+
+## Future or PAST??? Projection
+
+Explain your future or Past model results. 
+Is there a change? an expansion, a reduction or a shift?
+
+```{r echo=FALSE}
+plot(myBiomodProjFut)
+```
+
+# Discussion
+
+Very shortly discuss under these subheadings. Change them accordingly.
+
+## Future Distribution
+
+## Comparison to Literature 
+
+```{r echo=FALSE}
+plot(myBiomodProj)
+```
+
+![**Figure 1. Current distribution of *Aedes albopictus* provided by GBIF ^(10)^**](dist_current.png)
+
+
+```{r echo=FALSE}
+plot(myBiomodProjFut)
+```
+
+![**Figure 1. Future distribution prediction of *Aedes albopictus* ^(11)^**](dist_future.png)
+
+
+
+```{r include=FALSE}
+myBiomodModelEval <- get_evaluations(myBiomodModelout)
+myBiomodModelEval
+```
+
+# What did you learn from this project?
+
+Please expalin what did youlearn from this project briefly.
+
+# References
+
+An example::::
+
+1.	Kotsakiozi, P., Richardson, J. B., Pichler, V., Favia, G., Martins, A. J., Urbanelli, S., Armbruster, P. A., & Caccone, A. (2017). Population genomics of the Asian tiger mosquito, *Aedes albopictus* insights into the recent worldwide invasion. *Ecology and evolution, 7*23), 10143–10157. https://doi.org/10.1002/ece3.3514
+2.	European Centre for Disease Prevention and Control. (2019, March 18). Aedes albopictus. Retrieved February 04, 2021, from https://www.ecdc.europa.eu/en/disease-vectors/facts/mosquito-factsheets/aedes-albopictus
+3.	Paupy, C., Delatte, H., Bagny, L., Corbel, V., & Fontenille, D. (2009). Aedes albopictus, an arbovirus vector: from the darkness to the light. *Microbes and infection, 11*(14-15), 1177–1185. https://doi.org/10.1016/j.micinf.2009.05.005
+
+
+
+
+
