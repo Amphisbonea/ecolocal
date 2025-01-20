@@ -1,6 +1,6 @@
 ---
-title: "Your title here"
-author: "Your name here"
+title: "Past, present and future occurence and distribution of Aedes aegypti in Turkey"
+author: "Emre Kara"
 output:
   html_document:
     toc: true
@@ -18,9 +18,7 @@ text-align: justify}
 
 # Introduction
 
-Write a short (2-3 paragraph) introduction about your species. 
-Explain why you picked it. 
-Cleearly explain you aims
+Climate change expedites habitat shifts as species endeavor to align with their ecological niches[1]. The Mediterranean region, known with its rich biodiversity, is of significant importance for scientific studies, hosting five globally recognized biodiversity hotspots. Encompassing diverse countries such as Italy, Greece, Egypt, and Turkey this region offers a unique opportunity to investigate and understand the intricate ecological dynamics and conservation challenges associated with these critical areas of high species diversity and endemism[2]. *Aedes aegypti*, an invasive species observed in Mediterranean countries, is a vector species known for transmitting diseases with global public health significance such as yellow fewer virus, dengue virus and chikungunya virus, prompts a focused examination within the biodiversity hotspots of the Mediterranean region[3]. Therefore, prediction of *Aedes aegypti* distribution can be associated present and future risks of these diseases, which can be carried out by using ecological niche models (ENMs) in which bioclimatic parameters and occurrence data are used[4]. The present distribution of *Aedes aegypti* is known to be influenced by the precipitation and regional temperatures, humidity, along with climatic conditions; for example, temperature of water[5,6,7,8]. Despite numerous ecological niche models exist for *Aedes aegypti*, there remains a notable absence of regional models specifically tailored for the context of Turkey. In this context, the objective of this project is to predict the distribution of *Aedes aegypti* under climate change scenarios taking into consideration bioclimatic parameters along with past and current occurrence data to provide a risk assessment and health service planning in the upcoming years against yellow fever, dengue and chikungunya viruses in Turkey.
 
 # Methods
 
@@ -28,52 +26,63 @@ Cleearly explain you aims
 
 ### Acquiring Species Occurrence Data
 
-Explain your occurence data. Source, how many and the years etc.. 
+Occurrence data for *Aedes aegypti* (yellow fever mosquito in English) was taken from the Global Biodiversity Information Facility (GBIF) database. In this database, 63.565 occurrence data exist, most located in the 15th parallel north regions such as South America, Mexico, part of Africa, India, Oceania, and part of Australia. In Turkey, 15 occurrence data for this species has been obtained so far, only one among them was documented with its coordinates, which is in the Aegean Sea side of Turkey. In the neighboring countries, few occurrence data exist such as 1 in Cyprus, 5 in Georgia, and 4 in Iran.
 
 ```{r include=FALSE}
+setwd("C:/Users/Emre Kara/Downloads")
+```
+
+```{r include=FALSE}
+setwd("C:/Users/Emre Kara/Downloads")
+
 library(biomod2)
 library(raster)
 library(dismo)
 library(sp)
 library(dplyr)
-
 #change the related part for you selected species
 #change all "aedes" variables below
 
-aedes <- gbif('your selection genus', 'your selection species', ext=NULL, args=NULL, geo=TRUE, sp=TRUE, 
-              removeZeros=TRUE, download=TRUE, ntries=5, start = 1, end = 300) 
-
-
+aedes <- gbif('Aedes', 'Aedes aegypti', ext=NULL, args= NULL, geo=TRUE, sp=TRUE, 
+              removeZeros=TRUE, download=TRUE, ntries=5, start = 1, end = 3000) 
 aedes.df <- data.frame(aedes)
 aedesXY <- aedes.df[,c('lon','lat')]
-aedesdfs <- slice_sample(aedesXY, n = 100, replace = FALSE) 
+aedesdfs <- slice_sample(aedesXY, n = 3000, replace = FALSE) #randomly selects 300 rows
 
 ```
 
 ### Formating Data for biomod2
 
-Eplain which layers do you use
+Bioclimatic parameters were obtained from the WorldClim database, and Annual Mean Temperature (BIO1), Mean Diurnal Range (BIO2), Isothermality (BIO3), Annual Precipitation (BIO12) and Precipitation of Driest Month (BIO14) were chosen to be used in this project among the 19 bioclimatic parameters (https://www.worldclim.org/data/bioclim.html). Bioclimatic parameters (BIO1, BIO2, BIO3, BIO12 and BIO14) were then stacked with the spatial occurrence data (longitude and latitude) of Aedes aegypti obtained from the GBIF mentioned earlier by using **BIOMOD_FormatingData** function from the **biomod2** library.
 
 ```{r include=FALSE}
-myRespName <- 'aedes.albopictus'
+myRespName <- 'aedes.aegypti'
 myResp <- SpatialPoints(coords = aedesdfs, proj4string = CRS(as.character(NA)), bbox = NULL)
 myRespXY <- data.frame(aedesdfs)
 
 #Why did you choose these parameters, write clearly
+bio1 <- raster("C:/wc2.1_2.5m_bio_1.tif") #Annual Mean Temperature
+bio2 <- raster("C:/wc2.1_2.5m_bio_2.tif") #Mean Diurnal Range
+bio3 <- raster("C:/wc2.1_2.5m_bio_3.tif") #Annual Precipitation
+bio12 <- raster("C:/wc2.1_2.5m_bio_12.tif")
+bio14 <- raster("C:/wc2.1_2.5m_bio_14.tif")
 
-bio1 <- raster("wc2.1_5m_bio_1.tif") #Annual Mean Temperature
-bio2 <- raster("wc2.1_5m_bio_2.tif") #Mean Diurnal Range
-bio12 <- raster("wc2.1_5m_bio_12.tif") #Annual Precipitation
+myExpl <- stack(bio1, bio2,bio3, bio12,bio14)
 
-myExpl <- stack(bio1, bio2, bio12)
-plot(myExpl)
+min_longitude <- 26  # Westernmost point
+max_longitude <- 45  # Easternmost point
+min_latitude <- 36   # Southernmost point
+max_latitude <- 42   # Northernmost point
 
+# Create the bounding box
+turkey_bbox <- extent(c(min_longitude, max_longitude, min_latitude, max_latitude))
+myExpl_cropped <- crop(myExpl, turkey_bbox)
 myBiomodData <- BIOMOD_FormatingData(resp.var=myResp,
                                      expl.var = myExpl,
                                      resp.xy= myRespXY,
                                      resp.name=myRespName,
-                                     PA.nb.rep = 1,
-                                     PA.nb.absences = 100,
+                                     PA.nb.rep = 3,
+                                     PA.nb.absences = 3000,
                                      PA.strategy = 'random',
                                      na.rm = TRUE)
 
@@ -81,22 +90,21 @@ myBiomodData <- BIOMOD_FormatingData(resp.var=myResp,
 
 ### Acquiring Historical & Future Bioclimatic Variables
 
-[Historical bioclimatic variables](https://www.worldclim.org/data/worldclim21.html) were acquired from WorldClim website with 5 minutes spatial resolution ^[6]^.
+[Present bioclimatic variables](https://www.worldclim.org/data/worldclim21.html) were acquired from WorldClim website with 5 minutes spatial resolution ^[6]^.
 
 [Future bioclimatic variables](https://www.worldclim.org/data/cmip6/cmip6_clim5m.html) were acquired from WorldClim website with 5 minutes spatial resolution for 2021-2040 time period and MIROC6 estimations for SSP370 ^[7]^. 
 
-WHY do you use these explain in the text?
+Ecological niche models (ENMs) based on the mathematical or empirical approximations of ecolohigical niche of species. They can be used to predict future distribution of the species as well as the current distribution based on various parameters such as species location, environmental variables and climate envelope parameters such as bioclimatic parameters[9]. These parameters were chosen in a similar study carried out by Portilla Cabrera & Selvaraj to show the geographic distribution of *Aedes aegypti* in Colombia due to their correlation less than or equal to 0.8 which indicated strong effect on geographic distribution of *Aedes aegypti*. As a result of their existing potential to have a strong effect on distribution of *Aedes aegypti*[10].
 
 ## Modeling
 
-EXPLAIN you modelling apporach. Which algorithms do you use? How many replicates do you makes.
-Can you merge them (ensemble?)?
+In this project, three modelling approaches were used which were MaxNet, GAM and CTA, and two types of metric evaluation approaches were used which were ROS and TSS. In the literature, MaxEnt modelling approach is frequently used to predict the future distribution of various species in globe or in countries. Therefore, MaxNet which is being a similar modelling approach to the MaxEnt was chosen to be used. The second method used was General Additive Model (GAM) because it is again used to construct ecological niche models very commonly. Furthermore, one additional model, Classification Tree Analysis (CTA) which is being a modelling approach generally used to construct presence-absence types of ENMs, is used to provide more comprehensive comparison within the models and with the literature. In addition, ROS is chosen as the evaluation metric in most of the studies which proves its existing accomplishment. TSS is used for comparison and enhancing the accuracy of the results. Three replicas were conducted for each model. At the end, all of the models were ensembled for each evaluation metrics and two final projections were obtained for current distribution. For the future distributions, two final projections for each year and SSPs were obtained. Ensembling was performed by using **BIOMOD_EnsembleModeling** function from the **biomod2** R package[11,12,13,14].
 
 
 ```{r include=FALSE}
 myBiomodModelout <- BIOMOD_Modeling(bm.format = myBiomodData,
                                     modeling.id = paste(myRespName,"Modeling",sep=""),
-                                    models = c('GAM', 'MAXENT.Phillips'),
+                                    models = c('MAXNET','GAM','CTA'),
                                     nb.rep = 1,
                                     data.split.perc = 80,
                                     prevalence = 0.5,
@@ -104,81 +112,301 @@ myBiomodModelout <- BIOMOD_Modeling(bm.format = myBiomodData,
                                     metric.eval = c('ROC', 'TSS'),
                                     scale.models = TRUE,
                                     do.full.models = FALSE)
+
+# Ensembling the Model:
+myBiomodModelout_Ensembled <- BIOMOD_EnsembleModeling(
+  bm.mod=myBiomodModelout,
+  models.chosen = "all",
+  em.by = "all",
+  em.algo= "EMmedian",
+  metric.select = "all",
+  metric.select.thresh = NULL,
+  metric.select.table = NULL,
+  metric.select.dataset = NULL,
+  metric.eval = c("ROC", "TSS"),
+  var.import = 0,
+  EMci.alpha = 0.05,
+  EMwmean.decay = "proportional",
+  nb.cpu = 1,
+  seed.val = NULL,
+  do.progress = TRUE,
+  prob.mean,
+  prob.median,
+  prob.cv,
+  prob.ci,
+  committee.averaging,
+  prob.mean.weight,
+  prob.mean.weight.decay,
+  prob.ci.alpha
+)
+
+
 ```
 
 ## Projections
 
 Both projections were done by **BIOMOD_Projection** function of **biomod2** R package. 
- 
+Ensembled projections were done by* **BIOMOD_EnsembleForecasting** function of **biomod2** R package
+
+
 ### Current Projection
 
-Explain which period do you project?
-Future or present.
+In this project, first current distribution is projected by using near current bioclimatic parameters which comprise the years between 1970 and 2000. Then, future distribution of the Aedes aegypti was projected for different SSPs in two different time periods. The first projections were carried out for SSP370 between 2021-2040 and 2041-2060. Which was followed by the projection of SSP585 for the same time periods. 
 
 ```{r include=FALSE}
 myBiomodProj <- BIOMOD_Projection(bm.mod = myBiomodModelout,
-                                  new.env = myExpl,
+                                  new.env = myExpl_cropped,
                                   proj.name = 'current',
                                   models.chosen = 'all',
-                                  metric.binary = c('ROC', 'TSS'),
+                                  metric.binary = c('ROC','TSS'),
                                   compress = TRUE,
                                   clamping.mask=F)
+
+myBiomodProj_EnsProj <- BIOMOD_EnsembleForecasting(
+  bm.em = myBiomodModelout_Ensembled,
+  bm.proj = myBiomodProj,
+  models.chosen = 'all',
+  metric.binary = 'all',
+  metric.filter = 'all'
+)
+
 ```
 
-### Future or Past???? Projection
+### Future Projection
 
-Which period, which climate model do you select and which ssp? 
+For future bioclimatic parameters, different Shared Socioeconomic Pathways (SSPs) were chosen to obtain the future bioclimatic parameters. Shared Socioeconomic Pathways are frameworks of different scenarios based on energy, emission, land use and some other implications of parameters. SSPs provide integrated analysis for future climate distributions, impacts, migration etc. Five different SSPs are classified describing inequality, development which can be socio-economical and fossil fueled or middle-of-the-road or sustainability[10]. Generally, these SSPs are combined with 2100 forcing levels (W/m2), and various standard scenarios exist based on the ScenarioMIP which is a part of the International Coupled Model Intercomparsion Project 6 (CMIP6) of the World Climate Research Program (WCRP) such as SSP126, SSP245, SSP370 which is known regional rivalry and SSP585 or fossil fueled development. In this project, future bioclimatic parameters were chosen for SSP370 and SSP585 to provide more comprehensive results with two different scenarios one being closer to moderate levels and one being severe[15].
 
 ```{r include=FALSE}
-abio <- raster::stack("future.tif")
-a_bio1 <- subset(abio, 'future_1')
-a_bio2 <- subset(abio, 'future_2')
-a_bio12 <- subset(abio, 'future_12')
 
-myExplFuture <- stack(a_bio1, a_bio2, a_bio12)
+#2021-2040 SSP370
+
+abio <- raster::stack("C:/wc2.1_5m_bioc_MIROC6_ssp370_2021-2040.tif")
+a_bio1 <- subset(abio, 'bio01')
+a_bio2 <- subset(abio, 'bio02')
+a_bio3 <- subset(abio, 'bio03')
+a_bio12 <- subset(abio, 'bio12')
+a_bio14 <- subset(abio, 'bio14')
+
+myExplFuture <- stack(a_bio1, a_bio2, a_bio3,a_bio12,a_bio14)
 names(myExplFuture) = names(myExpl)
-plot(myExplFuture)
+myExplFuture1_cropped <- crop(myExplFuture,turkey_bbox)
+
+#2041-2060 SSP370
+
+abio_2040 <- raster::stack("C:/wc2.1_5m_bioc_MIROC6_ssp370_2041-2060.tif")
+a_bio1_2040 <- subset(abio, 'bio01')
+a_bio2_2040 <- subset(abio, 'bio02')
+a_bio3_2040 <- subset(abio, 'bio03')
+a_bio12_2040 <- subset(abio, 'bio12')
+a_bio14_2040 <- subset(abio, 'bio14')
+
+myExplFuture2 <- stack(a_bio1_2040, a_bio2_2040, a_bio3_2040,a_bio12_2040,a_bio14_2040)
+names(myExplFuture2) = names(myExpl)
+myExplFuture2_cropped <- crop(myExplFuture,turkey_bbox)
+
+
+#2021-2040 SSP585
+
+abio_2040SSP5 <- raster::stack("C:/wc2.1_5m_bioc_MIROC6_ssp585_2021-2040.tif")
+a_bio1_2040SSP5 <- subset(abio, 'bio01')
+a_bio2_2040SSP5 <- subset(abio, 'bio02')
+a_bio3_2040SSP5 <- subset(abio, 'bio03')
+a_bio12_2040SSP5 <- subset(abio, 'bio12')
+a_bio14_2040SSP5 <- subset(abio, 'bio14')
+
+myExplFuture3 <- stack(a_bio1_2040SSP5, a_bio2_2040SSP5, a_bio3_2040SSP5,a_bio12_2040SSP5,a_bio14_2040SSP5)
+
+names(myExplFuture3) = names(myExpl)
+myExplFuture3_cropped <- crop(myExplFuture,turkey_bbox)
+
+#2041-2060 SSP585
+
+abio_2060SSP5 <- raster::stack("C:/wc2.1_5m_bioc_MIROC6_ssp585_2041-2060.tif")
+a_bio1_2060SSP5 <- subset(abio, 'bio01')
+a_bio2_2060SSP5 <- subset(abio, 'bio02')
+a_bio3_2060SSP5 <- subset(abio, 'bio03')
+a_bio12_2060SSP5 <- subset(abio, 'bio12')
+a_bio14_2060SSP5 <- subset(abio, 'bio14')
+
+myExplFuture4 <- stack(a_bio1_2060SSP5, a_bio2_2060SSP5, a_bio3_2060SSP5,a_bio12_2060SSP5,a_bio14_2060SSP5)
+
+names(myExplFuture4) = names(myExpl)
+myExplFuture4_cropped <- crop(myExplFuture,turkey_bbox)
+
+
 ```
 
 ```{r include=FALSE}
-myBiomodProjFut <- BIOMOD_Projection(bm.mod = myBiomodModelout,
-                                     new.env = myExplFuture,
-                                     proj.name = 'future',
+myBiomodProjFut1 <- BIOMOD_Projection(bm.mod = myBiomodModelout,
+                                     new.env = myExplFuture1_cropped,
+                                     proj.name = 'abiotic',
                                      models.chosen = 'all',
                                      metric.binary = c('ROC', 'TSS'),
                                      compress = TRUE,
                                      clamping.mask= F)
+
+
+myBiomodProjFut2 <- BIOMOD_Projection(bm.mod = myBiomodModelout,
+                                     new.env = myExplFuture2_cropped,
+                                     proj.name = 'abiotic',
+                                     models.chosen = 'all',
+                                     metric.binary = c('ROC', 'TSS'),
+                                     compress = TRUE,
+                                     clamping.mask= F)
+
+
+myBiomodProjFut3 <- BIOMOD_Projection(bm.mod = myBiomodModelout,
+                                     new.env = myExplFuture3_cropped,
+                                     proj.name = 'abiotic',
+                                     models.chosen = 'all',
+                                     metric.binary = c('ROC', 'TSS'),
+                                     compress = TRUE,
+                                     clamping.mask= F)
+
+myBiomodProjFut4 <- BIOMOD_Projection(bm.mod = myBiomodModelout,
+                                     new.env = myExplFuture4_cropped,
+                                     proj.name = 'abiotic',
+                                     models.chosen = 'all',
+                                     metric.binary = c('ROC', 'TSS'),
+                                     compress = TRUE,
+                                     clamping.mask= F)
+
+```
+
+
+```{r include=FALSE}
+myBiomodProj_EnsProj1 <- BIOMOD_EnsembleForecasting(
+  bm.em = myBiomodModelout_Ensembled,
+  bm.proj = myBiomodProjFut1,
+  models.chosen = 'all',
+  metric.binary = 'all',
+  metric.filter = 'all'
+)
+
+myBiomodProj_EnsProj2 <- BIOMOD_EnsembleForecasting(
+  bm.em = myBiomodModelout_Ensembled,
+  bm.proj = myBiomodProjFut2,
+  models.chosen = 'all',
+  metric.binary = 'all',
+  metric.filter = 'all'
+)
+
+myBiomodProj_EnsProj3 <- BIOMOD_EnsembleForecasting(
+  bm.em = myBiomodModelout_Ensembled,
+  bm.proj = myBiomodProjFut3,
+  models.chosen = 'all',
+  metric.binary = 'all',
+  metric.filter = 'all'
+)
+
+myBiomodProj_EnsProj4 <- BIOMOD_EnsembleForecasting(
+  bm.em = myBiomodModelout_Ensembled,
+  bm.proj = myBiomodProjFut4,
+  models.chosen = 'all',
+  metric.binary = 'all',
+  metric.filter = 'all'
+)
+
 ```
 
 ## Assessing Model Performances
+At this part of the project, model assesments were performed. As a result, specificity, calibration, cutoff and validation scores of each model for each metric evaluation method is obtained. Based on these results, it can be stated that the CTA model had the highest specificity among three models for both ROC and TSS evaluation metric. The CTA model also had the highest calibration and validation values as well. In addition, a trend for each model observed in a way that specificity, calibration and validation values of models for ROC is higher than the TSS. 
+```{r include=FALSE}
+myBiomodModelEval <- get_evaluations(myBiomodModelout)
+show(myBiomodModelEval)
+```
 
-Make a short assement about your model performance.
+
+
+
+
 # Results
+
+
 
 ## Present Projection
 
-Explain your present model results. 
-Is it realistic??
-Try to show only Turkiye and neighboring regions map NOT the whole world.
+In the figure below, the current distribution is shown. For all three models (MaxNet, GAM and CTA) the Aegean and Mediterranean coasts showed a higher density for the *Aedes aegypti* distribution. In addition, especially Istanbul and Kocaeli along with Marmara coasts of the Turkey showed a high density of distribution. Additionally, Adana was standing out in the Mediterranean coast. Thus, based on the current distribution projection, Aegean coasts, especially Izmir, Manisa and Aydin, Mediterranean coasts especially Adana and Marmara coasts, with Istanbul and Kocaeli prominent were the highest spots of Aedes aegypti distribution.
 
 ```{r echo=FALSE}
 plot(myBiomodProj)
 ```
+```{r echo=FALSE}
+plot(myBiomodProj_EnsProj1)
+```
 
-## Future or PAST??? Projection
+Additionally, in the figure above, the ensemble version of all models for the current projection is showed. Based on this projection, it can be concluded that ensembled models also strongly suggest these regions for high density of distribution as mentioned. However, when all of the models were ensembled, Istanbul and Kocaeli had a even higher density compared to the Aegean coasts which had a high density in each model. 
 
-Explain your future or Past model results. 
-Is there a change? an expansion, a reduction or a shift?
+
+## 2021-2040 SSP370 Future Projection
+
+In the figure provided below, the future projection between 2021 and 2040 time period under SSP370 scenario was shown. This result suggested the distribution of *Aedes aegypti* will not increase dramatically in this time period; however, there will be an increase in the regions where the *Aedes aegypti* was already present. Also, GAM and CTA models suggest that the Thracian sites of Turkey may face with an increase in the *Aedes aegypti* distribution.
 
 ```{r echo=FALSE}
-plot(myBiomodProjFut)
+plot(myBiomodProjFut1)
 ```
+
+
+
+## 2041-2060 SSP370 Future Projection
+
+Furthermore, when a further time period for the SSP370 was analyzed (2041-2060), it was observed that the regions that were mentioned in the current and 2021-2040 distribution can even face with an increased *Aedes aegypti*. However, the main difference in this time period was some regions in the Middle Anatolia showed a possible distribution sites.
+
+```{r echo=FALSE}
+plot(myBiomodProjFut2)
+```
+
+The next two projections were carried out under SSP585 scenario. In the figure below, the future distribution of the *Aedes aegypti* between 2021-2040 time period was given. This result suggested a similar outcome as the two projections under SSP370, and there was no significant change in the future distribution of *Aedes aegypti* when SSP370 and SSP585 compared in this time period. 
+
+## 2021-2040 SSP585 Future Projection
+
+```{r echo=FALSE}
+plot(myBiomodProjFut3)
+```
+
+
+## 2041-2060 SSP585 Future Projection
+
+In the last projection, 2041-2060 time period under SSP585 scenario was shown. Again, there was no significant difference between SSP585 and SSP370 time periods for this time period. Both SSP370 and SSP585 suggested a strong distribution and presence of *Aedes Aegypti* in the Aegean coasts mainly in Izmir, Manisa and Aydin, Mediterranean coasts especially in Adana, Marmara with Istanbul and Kocaeli were the ones standed out and laslty both SSP370 and SSP585 scenarios suggested a possible presence and distribution of *Aedes aegypti* in the Thracian region of Turkey. Also, some replicas of GAM and CTA models suggested possible distribution of *Aedes aegypti* can be observed in the future.
+```{r echo=FALSE}
+plot(myBiomodProjFut4)
+```
+
+
+## Ensembled Models
+
+Lastly, future projections were ensembled for each SSP and time period shown above. In the figure shown below, the ensembled projection of the SSP370 between 2021 and 2040 was shown. The ensemble projection indicates a strong probability of distribution and presence of *Aedes aegypti* species in the Istanbul and Koceli.
+
+```{r echo=FALSE}
+plot(myBiomodProj_EnsProj1)
+```
+
+```{r echo=FALSE}
+plot(myBiomodProj_EnsProj2)
+```
+
+```{r echo=FALSE}
+plot(myBiomodProj_EnsProj3)
+```
+
+```{r echo=FALSE}
+plot(myBiomodProj_EnsProj4)
+```
+
+
+Above, the remaining ensembled models were shown. From top to bottom, 2021-2040 SSP370 ensembled model, 2041-2060 SSP370 ensembled model, 2021-2040 SSP585 ensembled model and finally 2041-2060 SSP585 ensembled model were shown. All of them suggested more or less the same result. 
+
 
 # Discussion
 
-Very shortly discuss under these subheadings. Change them accordingly.
+
+## Current Distribution
+
+As mentioned earlier, *Aedes aegypti* is a vector-carrying invasive species which is observed in many countries including Mediterranean countries like Turkey[3]. Therefore, predicting the distribution of the *Aedes aegypti* plays a significant role in these ecosystems. Also, predicting the distribution of the *Aedes aegypti* can play a vital role in the public health due to the disease the species carries. The hot spots for this species in Turkey based on the ENMs achieved are Aegean coasts such as Izmir, Manisa and Aydın, Marmara region especially Istanbul and Kocaeli and finally Mediterranean coasts in which Adana having the highest density. In the literature, many Aedes species including *Aedes aegypti* or other species such as *Aedes albopictus* were found to be invasive in these exact locations in Turkey[16]. Therefore, the results obtained from the current projection seemed reasonable.
 
 ## Future Distribution
+
+Future distributions for both SSP370 and SSP585 scenarios suggested *Aedes aegypti* species can be a significant problem in many regions of Turkey starting from 2021 and even increasing the risk in the future. This problem can affect the ecosystem structure of these sides of Turkey since *Aedes aegypti* is an invasive species but also it can cause a burden in the public health facilities of the Turkey since it causes many viral diseases such as yellow fever and chikungunya[3]. These models can be an early warning for the country to take measurements for its nature conservation and also health system that may face a severe problem in the future. 
 
 ## Comparison to Literature 
 
@@ -186,33 +414,58 @@ Very shortly discuss under these subheadings. Change them accordingly.
 plot(myBiomodProj)
 ```
 
-![**Figure 1. Current distribution of *Aedes albopictus* provided by GBIF ^(10)^**](dist_current.png)
+![**Figure 1. Current distribution of *Aedes albopictus* provided by GBIF ^(17)^**](current_dist.jpeg)
+
+In the Figure 1, the current distribution of the Aedes aegypti taken from the GBIF was shown. As it can be seen, there is only one point showing the only single data with exact 3D coordinations found in Turkey. So far, only 15 occurence data of *Aedes aegypti* were detected in Turkey only one having the 3D coordinations. Due to the lack of data from Turkey, the ENMs were constructed based on the data in globe (more than 63.000 occurences). Therefore, the overlapping regions with the data given in Figure 1 and current projection from the ENMs is the regions were the species was alread detected. Other regions that the ENMs suggest the *Aedes aegypti* can exist may be the regions where the species is found but not discovered yet or indicating possible regions that the species can occupy but did not have the chance to do so. 
 
 
 ```{r echo=FALSE}
-plot(myBiomodProjFut)
+plot(myBiomodProjFut2)
 ```
 
-![**Figure 1. Future distribution prediction of *Aedes albopictus* ^(11)^**](dist_future.png)
-
-
-
-```{r include=FALSE}
-myBiomodModelEval <- get_evaluations(myBiomodModelout)
-myBiomodModelEval
+```{r echo=FALSE}
+plot(myBiomodProj_EnsProj2)
 ```
+
+
+![**Figure 1. Future distribution prediction of *Aedes albopictus* ^(18)^**](future_dist2.jpg)
+
+In the Figure 2, the future distribution of the *Aedes aegypti* was provided by Laporta et al. under SSP370 for 4 different time periods (2021-2040, 2041-2060, 2061-2080, 2081-2100) was shown which was carried out by Global Climate Model[18]. On the Figure 2, it is obvious that *Aedes aegypti* expanded its ecological niche towards the Middle Anatolia from the coast sites that it already existed. Our ENMs results for SSP370 from 2041-2060 provided above the Figure 2 suggested that it is very likely that *Aedes aegypti* can expand its ecological niche and enhance in numbers in the regions where it already existed mainly in Aegean and Mediterranean coasts. Also, our results (especially the CAT model) suggested that the *Aedes aegypti* can expand its ecological niche towards the Middle Anatolia.
+
+
+
+# Conclusion
+
+In conclusion, *Aedes aegypti* is an invasive species that carries many viral diseases such as yellow fever, dengeu and chikungunya virus diseases. Additionally, it expands its ecological niche in globe especially in Mediterranean countries such as Turkey. Therefore, predicting the future distribution of this species is not only important for ecosystem conservation studies but also public health services. In Turkey, most probably, the *Aedes aegypti* will expand its ecological niche from coast sites of the country in which it already exists towards to the Middle Anatolia. Therefore, this project should be considered as an early indicator of ecosystem conservation of Turkey and public health services that can face severe epidemics caused by viruses this species carries. In both SSP370 and SSP585 scenarios based on results of ENMs, *Aedes aegypti* will start expanding its ecological niche in Turkey. Therefore, an immediate measurements should be taken in Turkey. 
 
 # What did you learn from this project?
 
-Please expalin what did youlearn from this project briefly.
+First, I learned how can I find occurence of a species. To do so, we use GBIF. Then, I learned how to construct an ecological niche model by using this data I obtained. To do so, we can use various parameters. For example, bioclimatic parameters are one of them that can be used. From WorldClim database, I obtained both current and future parameters. Then, by using **biomod2** package of R, I conducted an ecological niche model for current and future time periods with different SSPs. Meanwhile, I learned how functions within the **biomod2** work such as formating, modelling and projecting the data. Then, I had to crop my map to only show to Turkey which was challenging at the beginning but I solved this problem with a bunch of code after completely understanding how these functions work. Finally, I ensembled all of the models to get the final and ensembled models. To do so, I used two different functions called **BIOMOD_EnsembleModeling** and **BIOMOD_EnsembleForecasting**. Finally, in general, even though I worked with R before, thanks to this project I learned to work with R Markdown. 
 
 # References
+1. Klausmeyer, K. R., & Shaw, M. R. (2009). Climate change, habitat loss, protected areas and the climate adaptation potential of species in Mediterranean ecosystems worldwide. PLoS ONE, 4(7). https://doi.org/10.1371/journal.pone.0006392 
+2. Shifting habitats. Nat. Clim. Chang. 10, 377 (2020). https://doi.org/10.1038/s41558-020-0789-x
+3. Aedes aegypti - factsheet for experts. European Centre for Disease Prevention and Control. (2023, January 2). https://www.ecdc.europa.eu/en/disease-vectors/facts/mosquito-factsheets/aedes-aegypti 
+4. Banerjee, A. K., Mukherjee, A., Guo, W., Ng, W. L., & Huang, Y. (2019). Combining ecological niche modeling with genetic lineage information to predict potential distribution of Mikania micrantha kunth in south and Southeast Asia under predicted climate change. Global Ecology and Conservation, 20. https://doi.org/10.1016/j.gecco.2019.e00800 
+5. Campbell, L. P., Luther, C., Moo-Llanes, D., Ramsey, J. M., Danis-Lozano, R., & Peterson, A. T. (2015). Climate change influences on global distributions of dengue and chikungunya virus vectors. Philosophical Transactions of the Royal Society B: Biological Sciences, 370(1665), 20140135. 
+6. Andriamifidy, R. F., Tjaden, N. B., Beierkuhnlein, C., & Thomas, S. M. (2019). Do we know how mosquito disease vectors will respond to climate change?. Emerging Topics in Life Sciences, 3(2), 115-132.
+7. L. M. Rueda, K. J. Patel, R. C. Axtell, R. E. Stinner, Temperature-Dependent Development and Survival Rates of Culex quinquefasciatus and Aedes aegypti (Diptera: Culicidae), Journal of Medical Entomology, Volume 27, Issue 5, 1 September 1990, Pages 892–898, https://doi.org/10.1093/jmedent/27.5.892
+8. Kraemer, M. U., Sinka, M. E., Duda, K. A., Mylne, A. Q., Shearer, F. M., Barker, C. M., ... & Hay, S. I. (2015). The global distribution of the arbovirus vectors Aedes aegypti and Ae. albopictus. elife, 4, e08347.
+9. Sillero, N., Arenas-Castro, S., Enriquez‐Urzelai, U., Vale, C. G., Sousa-Guedes, D., Martínez-Freiría, F., ... & Barbosa, A. M. (2021). Want to model a species niche? A step-by-step guideline on correlative ecological niche modelling. Ecological Modelling, 456, 109671. 
+10. Portilla Cabrera, C. V., & Selvaraj, J. J. (2020a). Geographic shifts in the bioclimatic suitability for Aedes aegypti under climate change scenarios in Colombia. Heliyon, 6(1). doi:10.1016/j.heliyon.2019.e03101 
+11. Phillips, S. J., & Dudík, M. (2008). Modeling of species distributions with Maxent: new extensions and a comprehensive evaluation. Ecography, 31(2), 161-175.
+12. Banerjee, A. K., Mukherjee, A., Guo, W., Ng, W. L., & Huang, Y. (2019). Combining ecological niche modeling with genetic lineage information to predict potential distribution of Mikania micrantha Kunth in South and Southeast Asia under predicted climate change. Global Ecology and Conservation, 20, e00800.
+13. Sillero, N., Arenas-Castro, S., Enriquez‐Urzelai, U., Vale, C. G., Sousa-Guedes, D., Martínez-Freiría, F., ... & Barbosa, A. M. (2021). Want to model a species niche? A step-by-step guideline on correlative ecological niche modelling. Ecological Modelling, 456, 109671.
+14. Citores, L., Ibaibarriaga, L., Lee, D. J., Brewer, M. J., Santos, M., & Chust, G. (2020). Modelling species presence–absence in the ecological niche theory framework using shape-constrained generalized additive models. Ecological Modelling, 418, 108926.
+15. Riahi, K., van Vuuren, D. P., Kriegler, E., Edmonds, J., O’Neill, B. C., Fujimori, S., … Tavoni, M. (2017). The shared socioeconomic pathways and their energy, land use, and greenhouse gas emissions implications: An overview. Global Environmental Change, 42, 153–168. doi:10.1016/j.gloenvcha.2016.05.009 
+16. DEMİRCİ, B., BEDİR, H., ÖZTÜRK, M., AKİNER, M. M. (2021). Status of the invasive mosquito species Aedes aegypti (L., 1762) and Aedes albopictus (Skuse, 1895) (Diptera: Culicidae) in Turkey. Turkish Journal of Entomology, 45(2), 279-292. https://doi.org/10.16970/entoted.879297
+17. Aedes aegypti (Linnaeus, 1762) (no date) GBIF. Available at: https://www.gbif.org/species/1651891 (Accessed: 21 January 2024). 
+18. Laporta, G. Z., Potter, A. M., Oliveira, J. F. A., Bourke, B. P., Pecor, D. B., & Linton, Y. M. (2023). Global Distribution of Aedes aegypti and Aedes albopictus in a Climate Change Scenario of Regional Rivalry. Insects, 14(1), 49. https://doi.org/10.3390/insects14010049
 
-An example::::
 
-1.	Kotsakiozi, P., Richardson, J. B., Pichler, V., Favia, G., Martins, A. J., Urbanelli, S., Armbruster, P. A., & Caccone, A. (2017). Population genomics of the Asian tiger mosquito, *Aedes albopictus* insights into the recent worldwide invasion. *Ecology and evolution, 7*23), 10143–10157. https://doi.org/10.1002/ece3.3514
-2.	European Centre for Disease Prevention and Control. (2019, March 18). Aedes albopictus. Retrieved February 04, 2021, from https://www.ecdc.europa.eu/en/disease-vectors/facts/mosquito-factsheets/aedes-albopictus
-3.	Paupy, C., Delatte, H., Bagny, L., Corbel, V., & Fontenille, D. (2009). Aedes albopictus, an arbovirus vector: from the darkness to the light. *Microbes and infection, 11*(14-15), 1177–1185. https://doi.org/10.1016/j.micinf.2009.05.005
+
+
+
 
 
 
